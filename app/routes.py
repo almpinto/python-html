@@ -1,18 +1,48 @@
-from flask import render_template
-from app import app
+from app import app, db
+from flask import render_template, request, redirect, url_for, flash
+from flask_login import current_user, login_user, logout_user, login_required
+from app.models import User
+from werkzeug.urls import url_parse
 
 @app.route('/')
 @app.route('/index')
+@login_required
 def index():
     user = {'username': 'André'}
     posts = [
-        {
-            'author': {'username': 'Dr. Python'},
-            'body': 'Não acaba essa Aula'
-        },
-        {
-            'author': {'username': 'Eu'},
-            'body': 'Não aguento mais'
-        }
+        {'author': {'username': 'Dr. Python'},'body': 'Não acaba essa Aula'},
+        {'author': {'username': 'Eu'},'body': 'Não aguento mais'}
     ]
-    return render_template('index.html', title='Estudando Flask Python', user=user, posts=posts)
+    return render_template('index.html', title='Estudando Flask Python', user=current_user, posts=posts)
+
+
+@app.route('/login', methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    if request.method == "POST":
+        user = User.query.filter_by(username=request.values.get("user")).first()
+        if user is None or not user.password == request.values.get("pass"):
+            flash('Invalid username or password')
+            return redirect(url_for('login'))
+        r = request.values.get("remember") == "on"
+        login_user(user, remember=r)
+        return redirect(url_for('index'))
+    return render_template("login.html" , title="Login")
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+@app.route('/register', methods=["GET", "POST"])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    if request.method == "POST":
+        user = User(username=request.values.get('user'),
+                    password=request.values.get('pass'))
+        db.session.add(user)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template("register.html" , title="Register")
